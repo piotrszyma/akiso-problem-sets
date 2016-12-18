@@ -60,6 +60,33 @@ int main(int argc, char *argv[]) {
         perror("ERROR connecting");
         exit(1);
     }
+    char username[MAXSIZE];
+    char password[MAXSIZE];
+
+    do {
+        printf("[ftp] # Username: ");
+        bzero(buffer, 256);
+        fgets(buffer, 255, stdin);
+        strcpy(username, buffer);
+        n = write(sockfd, username, 256);
+
+        printf("[ftp] # Password: ");
+        bzero(buffer, 256);
+        fgets(buffer, 255, stdin);
+
+        strcpy(password, buffer);
+
+        n = write(sockfd, password, 256);
+
+        n = read(sockfd, buffer, 1);
+
+        if(buffer[0] != '-') {
+            printf("[ftp] # Wrong login/pass, try again.\n");
+        }
+    } while (buffer[0] != '-');
+
+
+
 
     /* Now ask for a message from the user, this message
        * will be read by server
@@ -76,7 +103,7 @@ int main(int argc, char *argv[]) {
 
         //jesli komenda do lsc to printnij pliki klienta
         if (strcmp(command, "lsc") == 0) {
-            system("ls -p");
+            system("ls -pa");
 
             //jesli komenda to end to zakoncz dzialanie klienta
         } else if (strcmp(command, "end") == 0) {
@@ -225,6 +252,16 @@ int main(int argc, char *argv[]) {
             } else if (command[0] == 'l' && command[1] == 's') {
                 //pobierz z serwera wynik ls -p
 
+                n = read(sockfd, buffer, 255);
+
+                if (n < 0) {
+                    perror("ERROR reading from socket");
+                    exit(1);
+                } else {
+                    //wypisz ls z serwera
+                    printf("%s", buffer);
+                }
+            } else if (command[0] == 'c' && command[1] == 'd') {
                 n = read(sockfd, buffer, 255);
 
                 if (n < 0) {

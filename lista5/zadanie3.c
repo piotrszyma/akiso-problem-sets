@@ -18,15 +18,13 @@
 #define MAXSIZE 512
 
 
-void doprocessing(int sock);
-
-int strcmd(char *command);
-
-int put(char *command);
-
-int get(char *command);
-
 int main(int argc, char *argv[]) {
+    char username[] = "admin";
+    char password[] = "pass";
+
+    char password_tmp[256];
+    char username_tmp[256];
+
     int sockfd, newsockfd, portno;
     unsigned int clilen;
     char buffer[MAXSIZE];
@@ -35,7 +33,6 @@ int main(int argc, char *argv[]) {
     char command[5];
     struct stat file;
     int filehandle, size;
-
 
     /* First call to socket() function */
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -69,12 +66,42 @@ int main(int argc, char *argv[]) {
     clilen = sizeof(cli_addr);
 
     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    int isOk = 0;
+
+    while (isOk == 0) {
+        if (newsockfd < 0) {
+            perror("ERROR on accept");
+            exit(1);
+        }
+
+        n = recv(newsockfd, buffer, MAXSIZE, 0);
 
 
-    if (newsockfd < 0) {
-        perror("ERROR on accept");
-        exit(1);
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            break;
+        }
+
+        sscanf(buffer, "%s", username_tmp);
+        bzero(buffer, 256);
+        n = recv(newsockfd, buffer, MAXSIZE, 0);
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            break;
+        }
+
+        sscanf(buffer, "%s", password_tmp);
+        bzero(buffer, 256);
+        if (strcmp(password, password_tmp) == 0 && strcmp(username, username_tmp) == 0) {
+            n = write(newsockfd, "-", 1);
+            isOk = 1;
+        } else {
+            n = write(newsockfd, "0", 1);
+        }
     }
+
+
     while (1) {
 
         n = recv(newsockfd, buffer, MAXSIZE, 0);
@@ -94,7 +121,7 @@ int main(int argc, char *argv[]) {
             bzero(buffer, MAXSIZE);
             bzero(output, MAXSIZE);
             int b_ptr = 0, output_size = 0;
-            FILE *fp = popen("ls -p", "r");
+            FILE *fp = popen("ls -pa", "r");
             while (fgets(buffer, MAXSIZE, fp)) {
                 strcat(output, buffer);
                 while (buffer[b_ptr] != '\0') {
@@ -107,11 +134,29 @@ int main(int argc, char *argv[]) {
             n = write(newsockfd, output, output_size);
 
         } else if (command[0] == 'c' && command[1] == 'd') {
+            char newdir[MAXSIZE];
+            char cwdir[MAXSIZE];
 
-            int err = chdir("/folder");
+            int err;
+            getcwd(cwdir, MAXSIZE);
+            sscanf(buffer + 3, "%s", newdir);
+
+
+            if (newdir[0] == '.' && newdir[1] == '.') {
+                char *todel = strrchr(cwdir, 47);
+                (*todel) = '\0';
+                err = chdir(cwdir);
+            } else {
+                err = chdir(newdir);
+            }
+
+//            printf("%s", getcwd())
 
             if (err == 0) {
                 n = write(newsockfd, "Directory changed...\n", 22);
+//                getcwd(cwdir, MAXSIZE);
+//                printf("\nCurrent: %s\n", cwdir);
+//                fflush(stdout);
             } else {
                 n = write(newsockfd, "Directory doesn't exist...\n", 28);
             }
@@ -237,16 +282,11 @@ int main(int argc, char *argv[]) {
             }
 
 
-
-
         } else if (strcmp("end", command) == 0) {
             break;
         } else {
             n = write(newsockfd, "Unknown command\n", 16);
         }
-//        printf("%s", commands);
-//        printf("Here is the message: %s\n", buffer);
-
 
         if (n < 0) {
             perror("ERROR writing to socket");
